@@ -1,6 +1,20 @@
+# folders
+ - top folder: git, venv and west
+ - zephyr: zephyr project, cloned
+ - applications/test-app: "Zephyr workspace application"
+
+# test-app
+```sh
+from ./application/test-app
+west build -p always -b nucleo_f767zi -t flash .
+
+```
+
 # notes
  - installed stm32 tools (flah/debug, zephyr backend)
  - installed zephyr (deps + clone)
+
+https://docs.zephyrproject.org/latest/boards/st/nucleo_f767zi/doc/index.html
 
 https://docs.zephyrproject.org/latest/develop/getting_started/index.html
 ```
