@@ -1,0 +1,10 @@
+{
+    "C_Cpp.files.exclude": {
+        "**/zephyr/**": true,
+        "**/modules/**": true,
+        "**/bootloader/**": true
+    },
+    "C_Cpp.intelliSenseEngine": "default",
+    "C_Cpp.intelliSenseEngineFallback": "Disabled",
+    "git.ignoreLimitWarning": true
+}
