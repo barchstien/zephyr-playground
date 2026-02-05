@@ -1,16 +1,26 @@
 # folders
- - top folder: git, venv and west
- - zephyr: zephyr project, cloned
+Top folder is an umbrella folder
  - applications/test-app: "Zephyr workspace application"
+ - bootloader: added by west MCUboot
+ - modules: HAL code, like STM32 (BSD licensed) HW code
+ - tools: host tools, TUN scripts, qemu, test apps
+ - zephyr: zephyr project, cloned
 
-# test-app
+# TODO
+Use STM32 c code (BSD licensed), just like STM HAL code is used in modules/
+Make it compile, and add args to select i2c bus and GPIOs
+Wrap is with a zephyr driver (known by OS, and takes DT)
+Make a DT
+Add the driver to my-app, using prj.conf
+
+# dev notes
 ```sh
 from ./application/test-app
 west build -p always -b nucleo_f767zi -t flash .
 
 ```
 
-# notes
+# install
  - installed stm32 tools (flah/debug, zephyr backend)
  - installed zephyr (deps + clone)
 
@@ -53,3 +63,15 @@ west build -p always -b nucleo_f767zi samples/basic/threads/
 west flash
 
 ```
+
+# HW
+
+## nucleo F767ZI
+Set IP/DHCP in prj.conf
+
+## ToF vl53l8
+ - using i2c (not SPI)
+ - requires FW to be uploaded in boot
+ - ensure data returned for pixel is valid
+ - pixel data may contain several depth (through glass)
+ - pixel data has mouvement detection
