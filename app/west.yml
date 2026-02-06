@@ -1,0 +1,12 @@
+manifest:
+  projects:
+    - name: hal_st
+      url: https://github.com/barchstien/hal_st.git
+      revision: master
+      path: modules/hal/st
+      groups:
+        - hal
+    - name: zephyr
+      url: https://github.com/barchstien/zephyr.git
+      revision: main
+      import: true

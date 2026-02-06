@@ -36,9 +36,15 @@ python3 -m venv ./.venv
 source .venv/bin/activate
 pip install west
 
+# clone default repo
 west init .
+# overwritte zephy and hal_st repos
+west init -l app
+
 # source
-west update
+west update 
+west update --narrow -o=--depth=1
+
 # cmake
 west zephyr-export
 # west deps
