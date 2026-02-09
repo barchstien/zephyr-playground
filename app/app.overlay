@@ -1,0 +1,15 @@
+/*
+ * Copyright (c) 2026 Bastien Auneau <bastien.auneau@while-true.fr>
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+&i2c1 {
+    status = "okay";
+
+    vl53l8cx@52 {
+        compatible = "st,vl53l8cx";
+        reg = <0x52>;
+        int-gpios = <&gpiob 1 GPIO_ACTIVE_LOW>;
+    };
+};
