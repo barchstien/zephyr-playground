@@ -2,7 +2,7 @@ manifest:
   projects:
     - name: hal_st
       url: https://github.com/barchstien/hal_st.git
-      revision: master
+      revision: feature/vl53l8cx-driver
       path: modules/hal/st
       groups:
         - hal
