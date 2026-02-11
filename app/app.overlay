@@ -6,10 +6,12 @@
 
 &i2c1 {
     status = "okay";
+    clock-frequency = <I2C_BITRATE_FAST_PLUS>; /* 1 MHz */
 
     vl53l8cx@52 {
         compatible = "st,vl53l8cx";
         reg = <0x52>;
-        int-gpios = <&gpiob 1 GPIO_ACTIVE_LOW>;
+        lpn-gpios = <&gpiob 0 GPIO_ACTIVE_LOW>;
+        pwr-gpios = <&gpioa 7 GPIO_ACTIVE_LOW>;
     };
 };

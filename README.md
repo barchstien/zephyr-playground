@@ -31,14 +31,14 @@ https://docs.zephyrproject.org/latest/develop/getting_started/index.html
 # deps
 sudo apt install --no-install-recommends git cmake ninja-build gperf   ccache dfu-util device-tree-compiler wget python3-dev python3-venv python3-tk   xz-utils file make gcc gcc-multilib g++-multilib libsdl2-dev libmagic1
 
-# from sub zephy folder
+# from sub zephyr folder
 python3 -m venv ./.venv
 source .venv/bin/activate
 pip install west
 
 # clone default repo
 west init .
-# overwritte zephy and hal_st repos
+# overwritte zephyr and hal_st repos
 west init -l app
 
 # source
