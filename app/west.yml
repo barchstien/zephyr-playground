@@ -8,5 +8,5 @@ manifest:
         - hal
     - name: zephyr
       url: https://github.com/barchstien/zephyr.git
-      revision: main
+      revision: feature/vl53l8cx-driver
       import: true
