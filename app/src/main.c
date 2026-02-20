@@ -36,5 +36,10 @@ int main(void)
     //sensor_channel_get(dev, SENSOR_CHAN_DISTANCE, &val);
 
 	LOG_INF("STOP  ----");
+
+    while (true) {
+        k_msleep(3000);
+        LOG_INF("mmmmmmmmm ----");
+    }
 	return 0;
 }
