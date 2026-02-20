@@ -6,43 +6,35 @@
 
 #include <stdio.h>
 #include <zephyr/kernel.h>
-#include <zephyr/drivers/gpio.h>
+//#include <zephyr/drivers/gpio.h>
 
-/* 1000 msec = 1 sec */
-#define SLEEP_TIME_MS   1000
+#include <zephyr/logging/log.h>
 
-/* The devicetree node identifier for the "led0" alias. */
-#define LED0_NODE DT_ALIAS(led0)
+//#include <zephyr/sys/printk.h>
 
-/*
- * A build error on this line means your board is unsupported.
- * See the sample documentation for information on how to fix this.
- */
-static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
+LOG_MODULE_REGISTER(playground_app, LOG_LEVEL_INF);
 
 int main(void)
 {
 	int ret;
-	bool led_state = true;
 
-	if (!gpio_is_ready_dt(&led)) {
-		return 0;
-	}
+	//printk("RAW PRINTK: Entering main\n");
 
-	ret = gpio_pin_configure_dt(&led, GPIO_OUTPUT_ACTIVE);
-	if (ret < 0) {
-		return 0;
-	}
+	LOG_INF("START ----");
 
-	while (1) {
-		ret = gpio_pin_toggle_dt(&led);
-		if (ret < 0) {
-			return 0;
-		}
+	const struct device *dev = DEVICE_DT_GET_ONE(st_vl53l8cx);
 
-		led_state = !led_state;
-		//printf("LED state: %s\n", led_state ? "ON" : "OFF");
-		k_msleep(SLEEP_TIME_MS);
-	}
+    LOG_INF("is dev ready");
+    if (!device_is_ready(dev)) {
+        LOG_INF("dev NOT ready");
+        return 0;
+    }
+	LOG_INF("dev ready");
+
+    //struct sensor_value val;
+    //sensor_sample_fetch(dev);
+    //sensor_channel_get(dev, SENSOR_CHAN_DISTANCE, &val);
+
+	LOG_INF("STOP  ----");
 	return 0;
 }

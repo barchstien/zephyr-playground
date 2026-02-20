@@ -13,6 +13,17 @@ Wrap is with a zephyr driver (known by OS, and takes DT)
 Make a DT
 Add the driver to my-app, using prj.conf
 
+# HW notes
+X-nucleao-53L8AI
+name   | shield connector | ZIO/ UnoV3 | STM32
+------------------------------------------------
+LPN    | PB0 --> CN8 4    | A3         | PF3
+PWR_EN | PA7 --> CN5 4    | D11        | PA7 or PB5 ?
+
+Looks like PA7 is default for D11
+Mapping D11 to PB5 require inverting 2 bridges (ON,OFF -> OFF,ON)
+Not using Eth fr now, so I openned J6 to disconnect ETH HW from PA7
+
 # dev notes
 ```sh
 from ./application/test-app

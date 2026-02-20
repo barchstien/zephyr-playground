@@ -4,14 +4,29 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/*
+ * WARNING: using PA7 as VL53L8CX PWR_EN
+ *          which conflicts with spi1 and Eth
+ *          disabling both for now
+ *          Eth is not a concern as long as JP6 is open
+ */
+&spi1 {
+	status = "disabled";
+};
+&mac {
+    status = "disabled";
+};
+
 &i2c1 {
     status = "okay";
-    clock-frequency = <I2C_BITRATE_FAST_PLUS>; /* 1 MHz */
-
+    /* 1 MHz, requires to set timings = som_hex, that is from STM32CubeMX */
+    /* clock-frequency = <I2C_BITRATE_FAST_PLUS>; */
+    /* 400Khz */
+    clock-frequency = <I2C_BITRATE_FAST>;
     vl53l8cx@52 {
         compatible = "st,vl53l8cx";
-        reg = <0x52>;
-        lpn-gpios = <&gpiob 0 GPIO_ACTIVE_LOW>;
-        pwr-gpios = <&gpioa 7 GPIO_ACTIVE_LOW>;
+        reg = <0x29>;
+        lpn-gpios = <&gpiof 3 GPIO_ACTIVE_HIGH>;
+        pwr-gpios = <&gpioa 7 GPIO_ACTIVE_HIGH>;
     };
 };
