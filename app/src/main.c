@@ -11,13 +11,17 @@
 
 #include <zephyr/logging/log.h>
 
-//#include <zephyr/sys/printk.h>
 
 LOG_MODULE_REGISTER(playground_app, LOG_LEVEL_INF);
+// debug
+//#include <zephyr/sys/printk.h>
+#include "vl53l8cx_debug.h"
 
 int main(void)
 {
 	int ret;
+    const uint32_t BUFF_DEBUG_SIZE = 100;
+    uint8_t buff[BUFF_DEBUG_SIZE];
 
 	//printk("RAW PRINTK: Entering main\n");
 
@@ -31,10 +35,9 @@ int main(void)
     }
 	LOG_INF("%s ready", dev->name);
 
-    ////////////////////////////////////////////////////////
-    struct sensor_value sample_freq = { .val1 = 10, .val2 = 0 };
-
-    printk("Setting frequency to 10 Hz...\n");
+    // sample freq
+    struct sensor_value sample_freq = { .val1 = 15, .val2 = 0 };
+    LOG_INF("Setting frequency to %d Hz...", sample_freq.val1);
     ret = sensor_attr_set(
         dev, 
         SENSOR_CHAN_DISTANCE, 
@@ -42,9 +45,8 @@ int main(void)
         &sample_freq
     );
     if (ret != 0) {
-        LOG_ERR("Failed to set sample frequency (error %d)\n", ret);
+        LOG_ERR("Failed to set sample frequency (error %d)", ret);
     }
-
     ret = sensor_attr_get(
         dev, 
         SENSOR_CHAN_DISTANCE, 
@@ -52,17 +54,33 @@ int main(void)
         &sample_freq
     );
     if (ret != 0) {
-        LOG_ERR("Failed to get sample frequency (error %d)\n", ret);
+        LOG_ERR("Failed to get sample frequency (error %d)", ret);
     }
     LOG_INF("Read back sample freq: %d", sample_freq.val1);
 
+    // resolution
     struct sensor_value resolution = { .val1 = 16, .val2 = 0 };
+    LOG_INF("Setting resolution to %d Hz...", resolution.val1);
     sensor_attr_set(
         dev, 
         SENSOR_CHAN_DISTANCE, 
         SENSOR_ATTR_RESOLUTION, 
         &resolution
     );
+    if (ret != 0) {
+        LOG_ERR("Failed to set resolution (error %d)", ret);
+    }
+
+    ret = sensor_attr_get(
+        dev, 
+        SENSOR_CHAN_DISTANCE, 
+        SENSOR_ATTR_RESOLUTION, 
+        &resolution
+    );
+    if (ret != 0) {
+        LOG_ERR("Failed to get resolution (error %d)", ret);
+    }
+    LOG_INF("Read back resolution: %d", resolution.val1);
     ///////////////////////////////////////////////////////////////
 #if 0
     /* 2. PREPARE: Get Standard Decoder */
@@ -90,8 +108,9 @@ int main(void)
     ///////////////////////////////////////////////////////////////
 
     while (true) {
-        k_msleep(10000);
-        LOG_INF("mmmmmmmmm ----");
+        //k_msleep(10000);
+        //LOG_INF("mmmmmmmmm ----");
+        test_read(dev, buff, BUFF_DEBUG_SIZE);
     }
 	return 0;
 }
