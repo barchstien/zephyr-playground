@@ -29,6 +29,8 @@ Not using Eth fr now, so I openned J6 to disconnect ETH HW from PA7
 from ./application/test-app
 west build -p always -b nucleo_f767zi -t flash .
 
+astyle --style=linux --indent=force-tab --recursive "*.c" "*.h"
+
 ```
 
 # install

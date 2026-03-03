@@ -28,5 +28,6 @@
         reg = <0x29>;
         lpn-gpios = <&gpiof 3 GPIO_ACTIVE_HIGH>;
         pwr-gpios = <&gpioa 7 GPIO_ACTIVE_HIGH>;
+        rdy-gpios = <&gpiob 5 GPIO_ACTIVE_LOW>;
     };
 };
