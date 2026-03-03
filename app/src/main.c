@@ -17,7 +17,7 @@ LOG_MODULE_REGISTER(playground_app, LOG_LEVEL_INF);
 //#include <zephyr/sys/printk.h>
 #include "vl53l8cx_debug.h"
 
-#define DEFAULT_SAMPLE_FREQ_HZ 15
+#define DEFAULT_SAMPLE_FREQ_HZ 10
 #define DEFAULT_ZONE_CNT 16 // 16 or 64
 
 /* 
@@ -56,29 +56,6 @@ int main(void)
         return 0;
     }
 	LOG_INF("%s ready", dev->name);
-#if 0
-    // sample freq
-    struct sensor_value sample_freq = { .val1 = DEFAULT_SAMPLE_FREQ_HZ, .val2 = 0 };
-    LOG_INF("Setting frequency to %d Hz...", sample_freq.val1);
-    ret = sensor_attr_set(
-        dev, 
-        SENSOR_CHAN_DISTANCE, 
-        SENSOR_ATTR_SAMPLING_FREQUENCY, 
-        &sample_freq
-    );
-    if (ret != 0) {
-        LOG_ERR("Failed to set sample frequency (error %d)", ret);
-    }
-    ret = sensor_attr_get(
-        dev, 
-        SENSOR_CHAN_DISTANCE, 
-        SENSOR_ATTR_SAMPLING_FREQUENCY, 
-        &sample_freq
-    );
-    if (ret != 0) {
-        LOG_ERR("Failed to get sample frequency (error %d)", ret);
-    }
-    LOG_INF("Read back sample freq: %d", sample_freq.val1);
 
     // resolution
     struct sensor_value resolution = { .val1 = DEFAULT_ZONE_CNT, .val2 = 0 };
@@ -103,7 +80,30 @@ int main(void)
         LOG_ERR("Failed to get resolution (error %d)", ret);
     }
     LOG_INF("Read back resolution: %d", resolution.val1);
-#endif
+
+    // sample freq, starts sampling if freq > 0
+    struct sensor_value sample_freq = { .val1 = DEFAULT_SAMPLE_FREQ_HZ, .val2 = 0 };
+    LOG_INF("Setting frequency to %d Hz...", sample_freq.val1);
+    ret = sensor_attr_set(
+        dev, 
+        SENSOR_CHAN_DISTANCE, 
+        SENSOR_ATTR_SAMPLING_FREQUENCY, 
+        &sample_freq
+    );
+    if (ret != 0) {
+        LOG_ERR("Failed to set sample frequency (error %d)", ret);
+    }
+    ret = sensor_attr_get(
+        dev, 
+        SENSOR_CHAN_DISTANCE, 
+        SENSOR_ATTR_SAMPLING_FREQUENCY, 
+        &sample_freq
+    );
+    if (ret != 0) {
+        LOG_ERR("Failed to get sample frequency (error %d)", ret);
+    }
+    LOG_INF("Read back sample freq: %d", sample_freq.val1);
+
     // decoder
     const struct sensor_decoder_api *decoder;
     sensor_get_decoder(dev, &decoder);
@@ -123,7 +123,7 @@ int main(void)
     uint8_t *buf;
 	uint32_t buf_len;
     struct sensor_chan_spec ch_spec = { SENSOR_CHAN_DISTANCE, 0 };
-    uint8_t fake_data_out[64];
+    int16_t fake_data_out[64];
 
     while (true) {
         /* Queue async read to the RTIO context; uses RTIO mempool for allocation */
@@ -164,8 +164,8 @@ int main(void)
 		}
 
 		rtio_cqe_release(&tof_rtio_ctx, cqe);
-        LOG_INF("------");
-		k_sleep(K_MSEC(10000));
+        //LOG_INF("------");
+		k_sleep(K_MSEC(1000));
     }
 #endif
 
