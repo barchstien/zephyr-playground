@@ -20,7 +20,9 @@
 &i2c1 {
     status = "okay";
     /* 1 MHz, requires to set timings = som_hex, that is from STM32CubeMX */
-    /* clock-frequency = <I2C_BITRATE_FAST_PLUS>; */
+    clock-frequency = <I2C_BITRATE_FAST_PLUS>; 
+    timings = <54000000 I2C_BITRATE_FAST_PLUS 0x500C15>;
+    //timings = <54000000 I2C_BITRATE_FAST 0x1090131F>;
     /* 400Khz */
     clock-frequency = <I2C_BITRATE_FAST>;
     vl53l8cx@29 {
@@ -28,6 +30,6 @@
         reg = <0x29>;
         lpn-gpios = <&gpiof 3 GPIO_ACTIVE_HIGH>;
         pwr-gpios = <&gpioa 7 GPIO_ACTIVE_HIGH>;
-        rdy-gpios = <&gpiob 5 GPIO_ACTIVE_LOW>;
+        rdy-gpios = <&gpioc 3 GPIO_ACTIVE_LOW>;
     };
 };
