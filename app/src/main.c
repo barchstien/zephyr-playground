@@ -18,7 +18,9 @@ LOG_MODULE_REGISTER(playground_app, LOG_LEVEL_INF);
 #include "vl53l8cx_debug.h"
 
 #define DEFAULT_SAMPLE_FREQ_HZ 10
-#define DEFAULT_ZONE_CNT 16 // 16 or 64
+#define DEFAULT_ZONE_CNT 16
+
+#define MAX_ZONE_CNT 64
 
 /* 
  * 1. Define RTIO context with a dedicated Memory Pool.
@@ -29,21 +31,21 @@ RTIO_DEFINE_WITH_MEMPOOL(
     8,                      // sq size
     8,                      // cq size
     16,                     // num of blocks
-    DEFAULT_ZONE_CNT * 2,   // block size, 2 bytes per zone
+    MAX_ZONE_CNT * 2 + 1,   // 1 byte (num of zone) + 2 bytes per zone
     sizeof(void *)          // byte aligne
 );
 
 SENSOR_DT_READ_IODEV(
     tof_iodev, 
     DT_INST(0, st_vl53l8cx), 
-    { SENSOR_CHAN_DISTANCE, DEFAULT_ZONE_CNT }
+    { SENSOR_CHAN_DISTANCE, 0 }
 );
 
 int main(void)
 {
 	int ret;
-    const uint32_t BUFF_DEBUG_SIZE = 100;
-    uint8_t buff[BUFF_DEBUG_SIZE];
+    //const uint32_t BUFF_DEBUG_SIZE = 100;
+    //uint8_t buff[BUFF_DEBUG_SIZE];
 
 	//printk("RAW PRINTK: Entering main\n");
 
@@ -60,7 +62,7 @@ int main(void)
     // resolution
     struct sensor_value resolution = { .val1 = DEFAULT_ZONE_CNT, .val2 = 0 };
     LOG_INF("Setting resolution to %d Hz...", resolution.val1);
-    sensor_attr_set(
+    ret = sensor_attr_set(
         dev, 
         SENSOR_CHAN_DISTANCE, 
         SENSOR_ATTR_RESOLUTION, 
@@ -124,8 +126,9 @@ int main(void)
 	uint32_t buf_len;
     struct sensor_chan_spec ch_spec = { SENSOR_CHAN_DISTANCE, 0 };
     int16_t fake_data_out[64];
+    int i = 0;
 
-    while (true) {
+    for (i=0; i<20; i++) {
         /* Queue async read to the RTIO context; uses RTIO mempool for allocation */
 		ret = sensor_read_async_mempool(&tof_iodev, &tof_rtio_ctx, NULL);
 		if (ret < 0) {
@@ -133,16 +136,23 @@ int main(void)
 			continue;
 		}
 
-		/* Block and consume the completion event */
 #if 0
+        /* Block and consume the completion event */
 		cqe = rtio_cqe_consume_block(&tof_rtio_ctx);
 #endif
-        cqe = rtio_cqe_consume(&tof_rtio_ctx);
-        while (cqe == 0) {
-            LOG_INF(" ... ");
-            k_sleep(K_MSEC(10));
-            cqe = rtio_cqe_consume(&tof_rtio_ctx);
-        }
+        //cqe = rtio_cqe_consume(&tof_rtio_ctx);
+        //while (cqe == 0) {
+        //    //LOG_INF(" ... ");
+        //    k_sleep(K_MSEC(1));
+        //    cqe = rtio_cqe_consume(&tof_rtio_ctx);
+        //}
+        cqe = rtio_cqe_consume_block(&tof_rtio_ctx);
+        // what about using this:
+        // Wait up to 500ms for exactly 1 completion event
+        //int copied = rtio_cqe_copy_out(&tof_rtio_ctx, &cqe, 1, K_MSEC(500));
+
+        
+        LOG_INF("Got CQE !");
 
 		if (cqe->result < 0) {
 			LOG_ERR(" *** Read failed with result: %d", cqe->result);
@@ -157,16 +167,24 @@ int main(void)
 			ret = decoder->decode(buf, ch_spec, &fit, 1, &fake_data_out);
 
             /////
-            LOG_INF("%d Got data: %d %d %d %d .. %d", 
-                ret, fake_data_out[0], fake_data_out[1], fake_data_out[2], fake_data_out[3], fake_data_out[15]);
+            LOG_INF("data: %d %d %d %d .. %d", 
+                fake_data_out[0], fake_data_out[1], fake_data_out[2], fake_data_out[3], fake_data_out[15]);
 
 			rtio_release_buffer(&tof_rtio_ctx, buf, buf_len);
 		}
 
 		rtio_cqe_release(&tof_rtio_ctx, cqe);
         //LOG_INF("------");
-		k_sleep(K_MSEC(1000));
+		//k_sleep(K_MSEC(10));
     }
+    // stop sampling
+    sample_freq.val1 = 0;
+    ret = sensor_attr_set(
+        dev, 
+        SENSOR_CHAN_DISTANCE, 
+        SENSOR_ATTR_SAMPLING_FREQUENCY, 
+        &sample_freq
+    );
 #endif
 
 #if 0
