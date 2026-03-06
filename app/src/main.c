@@ -18,7 +18,7 @@ LOG_MODULE_REGISTER(playground_app, LOG_LEVEL_INF);
 #include "vl53l8cx_debug.h"
 
 #define DEFAULT_SAMPLE_FREQ_HZ 10
-#define DEFAULT_ZONE_CNT 16
+#define DEFAULT_ZONE_CNT 64
 
 #define MAX_ZONE_CNT 64
 
@@ -28,10 +28,10 @@ LOG_MODULE_REGISTER(playground_app, LOG_LEVEL_INF);
  */
 RTIO_DEFINE_WITH_MEMPOOL(
     tof_rtio_ctx,           // name
-    8,                      // sq size
-    8,                      // cq size
-    16,                     // num of blocks
-    MAX_ZONE_CNT * 2 + 1,   // 1 byte (num of zone) + 2 bytes per zone
+    2,//8,                      // sq size
+    2,//8,                      // cq size
+    4,//16,                     // num of blocks
+    sizeof(VL53L8CX_ResultsData) + 1,//1360,//MAX_ZONE_CNT * 2 + 1,   // 1 byte (num of zone) + 2 bytes per zone
     sizeof(void *)          // byte aligne
 );
 
@@ -125,10 +125,11 @@ int main(void)
     uint8_t *buf;
 	uint32_t buf_len;
     struct sensor_chan_spec ch_spec = { SENSOR_CHAN_DISTANCE, 0 };
-    int16_t fake_data_out[64];
+    int16_t data_out[64];
+    int16_t data_tmp[64];
     int i = 0;
 
-    for (i=0; i<20; i++) {
+    for (i=0; i<1000000; i++) {
         /* Queue async read to the RTIO context; uses RTIO mempool for allocation */
 		ret = sensor_read_async_mempool(&tof_iodev, &tof_rtio_ctx, NULL);
 		if (ret < 0) {
@@ -152,7 +153,7 @@ int main(void)
         //int copied = rtio_cqe_copy_out(&tof_rtio_ctx, &cqe, 1, K_MSEC(500));
 
         
-        LOG_INF("Got CQE !");
+        //LOG_INF("Got CQE !");
 
 		if (cqe->result < 0) {
 			LOG_ERR(" *** Read failed with result: %d", cqe->result);
@@ -164,18 +165,61 @@ int main(void)
 		ret = rtio_cqe_get_mempool_buffer(&tof_rtio_ctx, cqe, &buf, &buf_len);
 		if (ret == 0) {
 			uint32_t fit = 0;
-			ret = decoder->decode(buf, ch_spec, &fit, 1, &fake_data_out);
-
+			ret = decoder->decode(buf, ch_spec, &fit, 1, &data_tmp);
+            rtio_release_buffer(&tof_rtio_ctx, buf, buf_len);
+#if 1
+            // inverse image
+            //for (int i=0; i<8; i++) {
+            //    memcpy(
+            //        data_out + (8-1-i) * 8, 
+            //        data_tmp + i * 8,
+            //        8 * sizeof(int16_t));
+            //}
+            for (int i=0; i<8; i++) {
+                for (int j=0; j<8; j++) {
+                    data_out[8*i + j] = data_tmp[8*(i+1) - (j + 1)];
+                }
+            }
+            //memcpy(data_out, data_tmp, 64 * sizeof(int16_t));
             /////
+            // Use [0 : 99] cm
+            //printk("blop %d", ret);
+            uint8_t pretty[200];
+            memset(pretty, 0, sizeof(pretty));
+            uint8_t ind = 0;
+            for (int i=0; i<64; i++) {
+                // mm -> cm
+                data_out[i] =  data_out[i] / 10;
+                if (data_out[i] >= 100) { data_out[i] = 99; }
+                if (i % 8 == 0) {
+                    //printk("\n");
+                    snprintf(pretty + ind, sizeof(pretty) - ind, "\n");
+                    ind += 1;
+                }
+                //printk("%d%d ", data_out[i]/10, data_out[i]%10);
+                if (data_out[i] == 99)
+                    snprintf(pretty + ind, sizeof(pretty) - ind, "   ");
+                else
+                    snprintf(pretty + ind, sizeof(pretty) - ind, "%d%d ", data_out[i]/10, data_out[i]%10);
+                ind += 3;
+            }
+            //printk("\n");
+            snprintf(pretty + ind, sizeof(pretty) - ind, "\n");
+            ind += 1;
+            //LOG_INF("%s", pretty);
+            printf("%s\n", pretty);
+            
+#else
             LOG_INF("data: %d %d %d %d .. %d", 
-                fake_data_out[0], fake_data_out[1], fake_data_out[2], fake_data_out[3], fake_data_out[15]);
-
-			rtio_release_buffer(&tof_rtio_ctx, buf, buf_len);
+                data_out[0], data_out[1], data_out[2], data_out[3], data_out[15]);
+#endif
+			
 		}
 
 		rtio_cqe_release(&tof_rtio_ctx, cqe);
         //LOG_INF("------");
 		//k_sleep(K_MSEC(10));
+        k_sleep(K_MSEC(250));
     }
     // stop sampling
     sample_freq.val1 = 0;
