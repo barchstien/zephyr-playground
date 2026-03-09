@@ -6,8 +6,8 @@ import sys
 # --- CONFIGURATION ---
 UDP_IP = "0.0.0.0"
 UDP_PORT = 5005
-MAX_DISTANCE = 4000  # mm
-EXPECTED_SIZE = 137  # 1 (Length) + 8 (Timestamp) + 128 (64 * 2 bytes)
+MAX_DISTANCE = 2000  # mm
+EXPECTED_SIZE = 133  # 1 (Length) + 4 (Timestamp) + 128 (64 * 2 bytes)
 
 # --- UI CONSTANTS ---
 GRID_COLS, GRID_ROWS = 8, 8
@@ -42,6 +42,133 @@ def get_cell_color(dist_mm):
         
     return (r, g, b)
 
+def get_cell_color2(dist_mm):
+    """ 
+    High-granularity multi-stop color mapping.
+    Maps 0-4000mm to a smooth Purple -> Blue -> Green -> Yellow -> Red gradient.
+    """
+    # 1. Clamp distance and normalize to 0.0 - 1.0
+    val = max(0, min(dist_mm, MAX_DISTANCE))
+    ratio = val / float(MAX_DISTANCE)
+
+    # 2. Define color stops (R, G, B)
+    # You can tweak these to change the 'feel' of the heatmap
+    colors = [
+        (255, 255, 255),   # 0%   - GESTURE PEAK (Pure White Glow)
+        (0, 255, 255),     # 25%  - ACTIVE ZONE (Bright Cyan)
+        (0, 100, 255),     # 50%  - VISIBLE (Azure Blue)
+        (70, 0, 150),      # 75%  - BACKGROUND (Deep Purple)
+        (20, 20, 30)       # 100% - SLEEP (Dark Navy Grey)
+    ]
+
+    # 3. Determine which segment of the gradient we are in
+    segment_float = ratio * (len(colors) - 1)
+    index = int(segment_float)
+    inner_ratio = segment_float - index # How far between index and index + 1
+
+    if index >= len(colors) - 1:
+        return colors[-1]
+
+    # 4. Linear Interpolation (Lerp) between the two colors
+    c1 = colors[index]
+    c2 = colors[index + 1]
+
+    r = int(c1[0] + (c2[0] - c1[0]) * inner_ratio)
+    g = int(c1[1] + (c2[1] - c1[1]) * inner_ratio)
+    b = int(c1[2] + (c2[2] - c1[2]) * inner_ratio)
+
+    return (r, g, b)
+
+def get_cell_color3(dist_mm):
+    """
+    High-Granularity Gesture Colormap.
+    Focuses the entire color resolution on the 0-1200mm range.
+    """
+    # 1. SETUP THE ACTIVE WINDOW
+    # Gestures happen close to the sensor. By ignoring the 'far' background,
+    # we 'zoom in' on the values that matter.
+    MIN_GESTURE_DIST = 50   # mm
+    MAX_GESTURE_DIST = 600 # mm 
+
+    if dist_mm == 0 or dist_mm > MAX_DISTANCE: return (20, 20, 25) # Dark Background
+    if dist_mm > MAX_GESTURE_DIST: return (40, 40, 60)      # Muted Far Plane
+
+    # 2. NORMALIZE WITHIN THE WINDOW
+    # This makes 50mm a much larger percentage of the total scale.
+    val = max(MIN_GESTURE_DIST, min(dist_mm, MAX_GESTURE_DIST))
+    ratio = (val - MIN_GESTURE_DIST) / float(MAX_GESTURE_DIST - MIN_GESTURE_DIST)
+
+    # 3. TURBO-INSPIRED HIGH-DENSITY GRADIENT (11 STOPS)
+    # Designed to maximize 'local' contrast so 50mm changes are visible.
+    # Order: Near (0.0) -> Far (1.0)
+    colors = [
+        (255, 255, 255), # 0.00 - Touch (White)
+        (255, 0, 255),   # 0.10 - Magenta
+        (180, 0, 255),   # 0.20 - Deep Purple
+        (0, 0, 255),     # 0.30 - Blue
+        (0, 150, 255),   # 0.40 - Sky Blue
+        (0, 255, 255),   # 0.50 - Cyan
+        (0, 255, 150),   # 0.60 - Teal
+        (0, 255, 0),     # 0.70 - Green
+        (150, 255, 0),   # 0.80 - Lime
+        (255, 255, 0),   # 0.90 - Yellow
+        (255, 150, 0)    # 1.00 - Orange
+    ]
+
+    # 4. Interpolate
+    segment_float = ratio * (len(colors) - 1)
+    idx = int(segment_float)
+    inner_ratio = segment_float - idx
+
+    if idx >= len(colors) - 1: return colors[-1]
+
+    c1, c2 = colors[idx], colors[idx + 1]
+    return (
+        int(c1[0] + (c2[0] - c1[0]) * inner_ratio),
+        int(c1[1] + (c2[1] - c1[1]) * inner_ratio),
+        int(c1[2] + (c2[2] - c1[2]) * inner_ratio)
+    )
+
+import colorsys # Make sure to add this at the top of your file!
+
+def get_cell_color4(dist_mm):
+    """
+    Maximum Contrast Depth Map for 50-600mm range.
+    Uses continuous HSV (Hue, Saturation, Value) math instead of stops.
+    """
+    MIN_GESTURE_DIST = 100
+    MAX_GESTURE_DIST = 1200
+
+    # 1. Handle Out-of-Bounds
+    if dist_mm == 0 or dist_mm > 4000:
+        return (10, 10, 15)  # Pitch black for no data
+    if dist_mm > MAX_GESTURE_DIST:
+        return (25, 25, 35)  # Very dark grey/blue for background
+
+    # 2. Normalize Depth (0.0 to 1.0)
+    val = max(MIN_GESTURE_DIST, min(dist_mm, MAX_GESTURE_DIST))
+    ratio = (val - MIN_GESTURE_DIST) / float(MAX_GESTURE_DIST - MIN_GESTURE_DIST)
+
+    # 3. CONTINUOUS HUE SWEEP
+    # We map the ratio directly to a Hue on the color wheel.
+    # We sweep from Hue 0.85 (Magenta/Pink - Close) down to Hue 0.35 (Green - Far).
+    # Because we use 50% of the entire color wheel for just 550mm, 
+    # a 50mm shift will result in a massive color jump (e.g., Blue to Cyan).
+    hue = 0.85 - (ratio * 0.50) 
+    
+    # 4. SATURATION & BRIGHTNESS
+    saturation = 1.0
+    brightness = 1.0
+
+    # Make the absolute closest objects 'glow' white
+    if ratio < 0.1: 
+        saturation = ratio * 10.0 # Fades from 0.0 (White) to 1.0 (Full Color)
+
+    # 6. Convert HSV back to RGB for Pygame
+    r, g, b = colorsys.hsv_to_rgb(hue, saturation, brightness)
+    
+    return (int(r * 255), int(g * 255), int(b * 255))
+
 def get_text_color_for_bg(bg_color):
     """ Return black or white text depending on the luminance of the background. """
     r, g, b = bg_color
@@ -67,7 +194,7 @@ def main():
 
     # State variables
     last_timestamp = 0
-    last_length = 0
+    last_zone_cnt = 0
     last_matrix = [0] * 64
     has_data = False
 
@@ -87,14 +214,17 @@ def main():
                 data, addr = sock.recvfrom(1024)
                 if len(data) == EXPECTED_SIZE:
                     packet_data = data
+                    #print(data.hex(' '), '\n')
+                else:
+                    print('wrong length: ', len(data))
         except BlockingIOError:
             pass # No more data in the socket buffer
 
         # 3. Parse Data
         if packet_data:
             # Format: < (Little Endian), B (1 Byte), Q (8 Bytes), 64H (64 x 2-byte unsigned shorts)
-            unpacked = struct.unpack('<B Q 64H', packet_data)
-            last_length = unpacked[0]
+            unpacked = struct.unpack('<B I 64H', packet_data)
+            last_zone_cnt = unpacked[0]
             last_timestamp = unpacked[1]
             last_matrix = unpacked[2:]
             has_data = True
@@ -109,7 +239,7 @@ def main():
                 idx = row * GRID_COLS + col
                 val = last_matrix[idx] if has_data else 0
                 
-                cell_bg = get_cell_color(val) if has_data else EMPTY_CELL_COLOR
+                cell_bg = get_cell_color4(val) if has_data else EMPTY_CELL_COLOR
                 x = MARGIN + col * CELL_SIZE
                 y = grid_start_y + row * CELL_SIZE
                 
@@ -128,8 +258,8 @@ def main():
         footer_y = grid_start_y + (GRID_ROWS * CELL_SIZE) + 20
         
         if has_data:
-            len_text = font_large.render(f"Packet Length: {last_length} bytes", True, TEXT_COLOR)
-            ts_text = font_large.render(f"Timestamp: {last_timestamp}", True, TEXT_COLOR)
+            len_text = font_large.render(f"last zone count: {last_zone_cnt}", True, TEXT_COLOR)
+            ts_text = font_large.render(f"Timestamp: {last_timestamp*0.001:.1f}", True, TEXT_COLOR)
         else:
             len_text = font_large.render("Waiting for data...", True, (200, 100, 100))
             ts_text = font_large.render(f"Listening on UDP {UDP_PORT}", True, TEXT_COLOR)

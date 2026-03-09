@@ -6,7 +6,7 @@ import math
 # --- CONFIGURATION ---
 UDP_IP = "127.0.0.1"
 UDP_PORT = 5005
-FPS = 30  # How many packets to send per second
+FPS = 15  # How many packets to send per second
 
 def main():
     print(f"Starting simulated ToF sensor stream to {UDP_IP}:{UDP_PORT}...")
@@ -15,7 +15,7 @@ def main():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     
     # Initial dummy timestamp
-    timestamp = 1000000000
+    timestamp = 10000
     frame_count = 0
 
     try:
@@ -40,14 +40,14 @@ def main():
             # 64H : 64 unsigned shorts (2 bytes each)
             
             # Packet size: 1 + 8 + (64 * 2) = 137 bytes
-            packet_len = 137 
-            packet = struct.pack('<B Q 64H', packet_len, timestamp, *matrix)
+            #packet_len = 137 
+            packet = struct.pack('<B I 64H', int(64), timestamp, *matrix)
 
             # 3. Send via UDP
             sock.sendto(packet, (UDP_IP, UDP_PORT))
 
             # 4. Increment state
-            timestamp += 33 # roughly 30fps in ms
+            timestamp += 66 # roughly 15fps in ms
             time.sleep(1/FPS)
 
     except KeyboardInterrupt:

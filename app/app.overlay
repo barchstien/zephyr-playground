@@ -10,12 +10,12 @@
  *          disabling both for now
  *          Eth is not a concern as long as JP6 is open
  */
-&spi1 {
-	status = "disabled";
-};
-&mac {
-    status = "disabled";
-};
+//&spi1 {
+//	status = "disabled";
+//};
+//&mac {
+//    status = "disabled";
+//};
 
 &i2c1 {
     status = "okay";

@@ -9,6 +9,7 @@
 //#include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/sensor.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/net/socket.h>
 #include <zephyr/rtio/rtio.h>
 
 
@@ -17,10 +18,13 @@ LOG_MODULE_REGISTER(playground_app, LOG_LEVEL_INF);
 //#include <zephyr/sys/printk.h>
 #include "vl53l8cx_debug.h"
 
-#define DEFAULT_SAMPLE_FREQ_HZ 10
+#define DEFAULT_SAMPLE_FREQ_HZ 15
 #define DEFAULT_ZONE_CNT 64
 
 #define MAX_ZONE_CNT 64
+
+#define DEST_PORT 5005
+#define DEST_ADDR "192.168.1.176"
 
 /* 
  * 1. Define RTIO context with a dedicated Memory Pool.
@@ -31,7 +35,7 @@ RTIO_DEFINE_WITH_MEMPOOL(
     2,//8,                      // sq size
     2,//8,                      // cq size
     4,//16,                     // num of blocks
-    sizeof(VL53L8CX_ResultsData) + 1,//1360,//MAX_ZONE_CNT * 2 + 1,   // 1 byte (num of zone) + 2 bytes per zone
+    sizeof(VL53L8CX_ResultsData) + 5,// 1 byte (num of zone) + 4 bytes timepoint msec + 2 bytes per zone
     sizeof(void *)          // byte aligne
 );
 
@@ -49,7 +53,7 @@ int main(void)
 
 	//printk("RAW PRINTK: Entering main\n");
 
-	LOG_INF("START ----");
+	LOG_INF("START ---- CONFIG_SYS_CLOCK_TICKS_PER_SEC:%d", CONFIG_SYS_CLOCK_TICKS_PER_SEC);
 
 	const struct device *dev = DEVICE_DT_GET_ONE(st_vl53l8cx);
 
@@ -109,6 +113,22 @@ int main(void)
     // decoder
     const struct sensor_decoder_api *decoder;
     sensor_get_decoder(dev, &decoder);
+
+    // UDP
+    int sock;
+    struct sockaddr_in dest_addr;
+    // 1. Create a UDP socket (AF_INET = IPv4, SOCK_DGRAM = UDP)
+    sock = zsock_socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (sock < 0) {
+        LOG_ERR("Failed to create socket: %d", errno);
+        return -51;
+    }
+    // 2. Setup destination address
+    dest_addr.sin_family = AF_INET;
+    dest_addr.sin_port = htons(DEST_PORT);
+    zsock_inet_pton(AF_INET, DEST_ADDR, &dest_addr.sin_addr);
+    
+
 #if 1
     // trigger
     //struct sensor_trigger trig = {
@@ -125,8 +145,8 @@ int main(void)
     uint8_t *buf;
 	uint32_t buf_len;
     struct sensor_chan_spec ch_spec = { SENSOR_CHAN_DISTANCE, 0 };
-    int16_t data_out[64];
-    int16_t data_tmp[64];
+    uint8_t data_out[1+4+64*2]; // TODO 
+    uint8_t data_tmp[1+4+64*2];
     int i = 0;
 
     for (i=0; i<1000000; i++) {
@@ -167,20 +187,23 @@ int main(void)
 			uint32_t fit = 0;
 			ret = decoder->decode(buf, ch_spec, &fit, 1, &data_tmp);
             rtio_release_buffer(&tof_rtio_ctx, buf, buf_len);
-#if 1
+            // header
+            memcpy(data_out, data_tmp, 5);
             // inverse image
-            //for (int i=0; i<8; i++) {
-            //    memcpy(
-            //        data_out + (8-1-i) * 8, 
-            //        data_tmp + i * 8,
-            //        8 * sizeof(int16_t));
-            //}
+#if 1
+            uint16_t *src = (int16_t*)(&data_tmp[5]);
+            uint16_t *dst = (int16_t*)(&data_out[5]);
             for (int i=0; i<8; i++) {
                 for (int j=0; j<8; j++) {
-                    data_out[8*i + j] = data_tmp[8*(i+1) - (j + 1)];
+                    dst[8*i + j] = src[8*(i+1) - (j + 1)];
+                    //dst[i*8+j] = src[i*8+j];
                 }
             }
-            //memcpy(data_out, data_tmp, 64 * sizeof(int16_t));
+#else
+            memcpy(data_out + 5, data_tmp + 5, 64*2);
+#endif
+
+#if 0
             /////
             // Use [0 : 99] cm
             //printk("blop %d", ret);
@@ -208,18 +231,20 @@ int main(void)
             ind += 1;
             //LOG_INF("%s", pretty);
             printf("%s\n", pretty);
-            
-#else
-            LOG_INF("data: %d %d %d %d .. %d", 
-                data_out[0], data_out[1], data_out[2], data_out[3], data_out[15]);
 #endif
+            int data_out_size = 1 + 4 + 64*2; // TODO
+            zsock_sendto(
+                sock, data_out, data_out_size, 0, 
+                (struct sockaddr *)&dest_addr, sizeof(dest_addr)
+            );
+
 			
 		}
 
 		rtio_cqe_release(&tof_rtio_ctx, cqe);
         //LOG_INF("------");
 		//k_sleep(K_MSEC(10));
-        k_sleep(K_MSEC(250));
+        //k_sleep(K_MSEC(250));
     }
     // stop sampling
     sample_freq.val1 = 0;
@@ -230,6 +255,8 @@ int main(void)
         &sample_freq
     );
 #endif
+
+    zsock_close(sock);
 
 #if 0
     while (true) {
