@@ -3,6 +3,7 @@ import struct
 import pygame
 import sys
 import colorsys
+from math import exp2
 
 # --- CONFIGURATION ---
 UDP_IP = "0.0.0.0"
@@ -127,8 +128,11 @@ def main():
                 shift = unpacked[4]
                 resolution = unpacked[5]
                 timestamp_delta = unpacked[6]
-                d_matrix = unpacked[7:]
+                d_matrix = list(unpacked[7:])
                 has_data = True
+                # convert data to meter, then mm
+                for i in range(len(d_matrix)):
+                    d_matrix[i] = (float(d_matrix[i]) / exp2(15-shift)) * 1000
         except struct.error as e:
             print(e, 'but got instead:', len(packet_data))
 

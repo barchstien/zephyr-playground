@@ -83,10 +83,10 @@ void wait_and_read(const struct sensor_decoder_api *decoder, int sock,
         
         // inverse image
         q15_t tmp[64];
-        memcpy(tmp, result.readings[0].distance_mm, sizeof(q15_t[64]));
+        memcpy(tmp, result.readings[0].distance, sizeof(q15_t[64]));
         for (int i=0; i<8; i++) {
             for (int j=0; j<8; j++) {
-                result.readings[0].distance_mm[8*i + j] = tmp[8*(i+1) - (j + 1)];
+                result.readings[0].distance[8*i + j] = tmp[8*(i+1) - (j + 1)];
             }
         }
 
