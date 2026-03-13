@@ -109,12 +109,8 @@ void wait_and_read(const struct sensor_decoder_api *decoder, int sock,
 int main(void)
 {
 	int ret;
-    //const uint32_t BUFF_DEBUG_SIZE = 100;
-    //uint8_t buff[BUFF_DEBUG_SIZE];
 
-	//printk("RAW PRINTK: Entering main\n");
-
-	LOG_INF("START ---- CONFIG_SYS_CLOCK_TICKS_PER_SEC:%d", CONFIG_SYS_CLOCK_TICKS_PER_SEC);
+	LOG_INF("START ---- tick/sec:%d", CONFIG_SYS_CLOCK_TICKS_PER_SEC);
 
 	const struct device *dev = DEVICE_DT_GET_ONE(st_vl53l8cx);
 
@@ -191,13 +187,14 @@ int main(void)
     //// main loop
 #ifdef VL53L8CX_STREAM
     //// streaming
-    struct rtio_sqe *sqe;
+    struct rtio_sqe *sqe = 0;
     // sensor_stream
     LOG_INF("sensor_stream()...");
     sensor_stream(&vl53l8cx_iodev, &vl53l8cx_rtio_ctx, NULL, &sqe);
     while (true) {
         wait_and_read(decoder, sock, &dest_addr);
     }
+    rtio_sqe_cancel(sqe);
 #else
     //// one-shot in a loop
     while (true) {
