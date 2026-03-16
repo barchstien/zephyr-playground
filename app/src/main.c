@@ -33,77 +33,77 @@ LOG_MODULE_REGISTER(playground_app, LOG_LEVEL_INF);
  * Args: name, sq_size (pow 2), cq_size (pow 2), mem_blocks, block_byte_size, alignment 
  */
 RTIO_DEFINE_WITH_MEMPOOL(
-    vl53l8cx_rtio_ctx,           // name
-    8,                      // submission
-    8,                      // completion
-    16,                     // num of blocks
-    VL53L8CX_SENSOR_READ_BLOCK_SIZE,
-    sizeof(void *)          // byte aligned
+	vl53l8cx_rtio_ctx,           // name
+	8,                      // submission
+	8,                      // completion
+	16,                     // num of blocks
+	VL53L8CX_SENSOR_READ_BLOCK_SIZE,
+	sizeof(void *)          // byte aligned
 );
 
 #define VL53L8CX_STREAM
 #ifdef VL53L8CX_STREAM
 SENSOR_DT_STREAM_IODEV(
-    vl53l8cx_iodev, 
-    DT_INST(0, st_vl53l8cx), 
-    { SENSOR_CHAN_DISTANCE, 0 }
+	vl53l8cx_iodev, 
+	DT_INST(0, st_vl53l8cx), 
+	{ SENSOR_CHAN_DISTANCE, 0 }
 );
 #else
 SENSOR_DT_READ_IODEV(
-    vl53l8cx_iodev, 
-    DT_INST(0, st_vl53l8cx), 
-    { SENSOR_CHAN_DISTANCE, 0 }
+	vl53l8cx_iodev, 
+	DT_INST(0, st_vl53l8cx), 
+	{ SENSOR_CHAN_DISTANCE, 0 }
 );
 #endif
 
 void wait_and_read(const struct sensor_decoder_api *decoder, int sock,
-                    struct sockaddr_in *dest_addr) {
-    struct rtio_cqe *cqe;
-    uint8_t *sensor_data_buff;
+					struct sockaddr_in *dest_addr) {
+	struct rtio_cqe *cqe;
+	uint8_t *sensor_data_buff;
 	uint32_t sensor_data_buff_len;
-    struct sensor_chan_spec ch_spec = { SENSOR_CHAN_DISTANCE, 0 };
-    static struct vl53l8cx_result_data result;
-    int ret;
+	struct sensor_chan_spec ch_spec = { SENSOR_CHAN_DISTANCE, 0 };
+	static struct vl53l8cx_result_data result;
+	int ret;
 
-    // wait for a completion event
-    cqe = rtio_cqe_consume_block(&vl53l8cx_rtio_ctx);
-    if (cqe->result < 0) {
-        LOG_ERR("cqe failed with result: %d", cqe->result);
-        rtio_cqe_release(&vl53l8cx_rtio_ctx, cqe);
-        return;
-    }
+	// wait for a completion event
+	cqe = rtio_cqe_consume_block(&vl53l8cx_rtio_ctx);
+	if (cqe->result < 0) {
+		LOG_ERR("cqe failed with result: %d", cqe->result);
+		rtio_cqe_release(&vl53l8cx_rtio_ctx, cqe);
+		return;
+	}
 
-    // Get data from completion queue element
-    ret = rtio_cqe_get_mempool_buffer(&vl53l8cx_rtio_ctx, cqe, &sensor_data_buff, &sensor_data_buff_len);
-    if (ret == 0) {
-        // decode the data, always comes 1 by 1
-        uint32_t fit = 0;
-        ret = decoder->decode(sensor_data_buff, ch_spec, &fit, 1, &result);
-        rtio_release_buffer(&vl53l8cx_rtio_ctx, sensor_data_buff, sensor_data_buff_len);
-        
-        // inverse image
-        q15_t tmp[64];
-        memcpy(tmp, result.readings[0].distance, sizeof(q15_t[64]));
-        for (int i=0; i<8; i++) {
-            for (int j=0; j<8; j++) {
-                result.readings[0].distance[8*i + j] = tmp[8*(i+1) - (j + 1)];
-            }
-        }
+	// Get data from completion queue element
+	ret = rtio_cqe_get_mempool_buffer(&vl53l8cx_rtio_ctx, cqe, &sensor_data_buff, &sensor_data_buff_len);
+	if (ret == 0) {
+		// decode the data, always comes 1 by 1
+		uint32_t fit = 0;
+		ret = decoder->decode(sensor_data_buff, ch_spec, &fit, 1, &result);
+		rtio_release_buffer(&vl53l8cx_rtio_ctx, sensor_data_buff, sensor_data_buff_len);
+		
+		// inverse image
+		q15_t tmp[64];
+		memcpy(tmp, result.readings[0].distance, sizeof(q15_t[64]));
+		for (int i=0; i<8; i++) {
+			for (int j=0; j<8; j++) {
+				result.readings[0].distance[8*i + j] = tmp[8*(i+1) - (j + 1)];
+			}
+		}
 
-        // send to UDP
-        ret = zsock_sendto(
-            sock, 
-            (uint8_t*)(&result), 
-            sizeof(struct vl53l8cx_result_data), 
-            0, 
-            (struct sockaddr*)dest_addr, 
-            sizeof(struct sockaddr_in)
-        );
-        if (ret < 0) {
-            LOG_ERR("UDP sendto failed errno:%d", errno);
-        }
-    }
-    rtio_cqe_release(&vl53l8cx_rtio_ctx, cqe);
+		// send to UDP
+		ret = zsock_sendto(
+			sock, 
+			(uint8_t*)(&result), 
+			sizeof(struct vl53l8cx_result_data), 
+			0, 
+			(struct sockaddr*)dest_addr, 
+			sizeof(struct sockaddr_in)
+		);
+		if (ret < 0) {
+			LOG_ERR("UDP sendto failed errno:%d", errno);
+		}
+	}
+	rtio_cqe_release(&vl53l8cx_rtio_ctx, cqe);
 }
 
 int main(void)
@@ -114,100 +114,145 @@ int main(void)
 
 	const struct device *dev = DEVICE_DT_GET_ONE(st_vl53l8cx);
 
-    if (!device_is_ready(dev)) {
-        LOG_INF("dev NOT ready");
-        return 0;
-    }
+	if (!device_is_ready(dev)) {
+		LOG_INF("dev NOT ready");
+		return 0;
+	}
 	LOG_INF("%s ready", dev->name);
 
-    // resolution
-    struct sensor_value resolution = { .val1 = DEFAULT_ZONE_CNT, .val2 = 0 };
-    LOG_INF("Setting resolution to %d Hz...", resolution.val1);
-    ret = sensor_attr_set(
-        dev, 
-        SENSOR_CHAN_DISTANCE, 
-        SENSOR_ATTR_RESOLUTION, 
-        &resolution
-    );
-    if (ret != 0) {
-        LOG_ERR("Failed to set resolution (error %d)", ret);
-    }
+	// resolution
+	struct sensor_value resolution = { .val1 = DEFAULT_ZONE_CNT, .val2 = 0 };
+	LOG_INF("Setting resolution to %d Hz...", resolution.val1);
+	ret = sensor_attr_set(
+		dev, 
+		SENSOR_CHAN_DISTANCE, 
+		SENSOR_ATTR_RESOLUTION, 
+		&resolution
+	);
+	if (ret != 0) {
+		LOG_ERR("Failed to set resolution (error %d)", ret);
+	}
 
-    ret = sensor_attr_get(
-        dev, 
-        SENSOR_CHAN_DISTANCE, 
-        SENSOR_ATTR_RESOLUTION, 
-        &resolution
-    );
-    if (ret != 0) {
-        LOG_ERR("Failed to get resolution (error %d)", ret);
-    }
-    LOG_INF("Read back resolution: %d", resolution.val1);
+	ret = sensor_attr_get(
+		dev, 
+		SENSOR_CHAN_DISTANCE, 
+		SENSOR_ATTR_RESOLUTION, 
+		&resolution
+	);
+	if (ret != 0) {
+		LOG_ERR("Failed to get resolution (error %d)", ret);
+	}
 
-    // sample freq
-    struct sensor_value sample_freq = { .val1 = DEFAULT_SAMPLE_FREQ_HZ, .val2 = 0 };
-    LOG_INF("Setting frequency to %d Hz...", sample_freq.val1);
-    ret = sensor_attr_set(
-        dev, 
-        SENSOR_CHAN_DISTANCE, 
-        SENSOR_ATTR_SAMPLING_FREQUENCY, 
-        &sample_freq
-    );
-    if (ret != 0) {
-        LOG_ERR("Failed to set sample frequency (error %d)", ret);
-    }
-    ret = sensor_attr_get(
-        dev, 
-        SENSOR_CHAN_DISTANCE, 
-        SENSOR_ATTR_SAMPLING_FREQUENCY, 
-        &sample_freq
-    );
-    if (ret != 0) {
-        LOG_ERR("Failed to get sample frequency (error %d)", ret);
-    }
-    LOG_INF("Read back sample freq: %d", sample_freq.val1);
+	// sample freq
+	struct sensor_value sample_freq = { .val1 = DEFAULT_SAMPLE_FREQ_HZ, .val2 = 0 };
+	LOG_INF("Setting frequency to %d Hz...", sample_freq.val1);
+	ret = sensor_attr_set(
+		dev, 
+		SENSOR_CHAN_DISTANCE, 
+		SENSOR_ATTR_SAMPLING_FREQUENCY, 
+		&sample_freq
+	);
+	if (ret != 0) {
+		LOG_ERR("Failed to set sample frequency (error %d)", ret);
+	}
+	ret = sensor_attr_get(
+		dev, 
+		SENSOR_CHAN_DISTANCE, 
+		SENSOR_ATTR_SAMPLING_FREQUENCY, 
+		&sample_freq
+	);
+	if (ret != 0) {
+		LOG_ERR("Failed to get sample frequency (error %d)", ret);
+	}
 
-    // decoder
-    const struct sensor_decoder_api *decoder;
-    sensor_get_decoder(dev, &decoder);
+	// ranging mode
+	// default is autonomous (good for power), using continuous (good for perf)
+	struct sensor_value ranging_mode = { .val1 = VL53L8CX_RANGING_MODE_CONTINUOUS, .val2 = 0 };
+	LOG_INF("Setting ranging mode to %d ...", ranging_mode.val1);
+	ret = sensor_attr_set(
+		dev, 
+		SENSOR_CHAN_DISTANCE, 
+		SENSOR_ATTR_VL53L8CX_RANGING_MODE, 
+		&ranging_mode
+	);
+	if (ret != 0) {
+		LOG_ERR("Failed to set ranging mode (error %d)", ret);
+	}
+	ret = sensor_attr_get(
+		dev, 
+		SENSOR_CHAN_DISTANCE, 
+		SENSOR_ATTR_VL53L8CX_RANGING_MODE, 
+		&ranging_mode
+	);
+	if (ret != 0) {
+		LOG_ERR("Failed to get rangin mode (error %d)", ret);
+	}
 
-    // UDP
-    int sock;
-    struct sockaddr_in dest_addr;
-    sock = zsock_socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    if (sock < 0) {
-        LOG_ERR("Failed to create socket: %d", errno);
-        return -EIO;
-    }
-    // destination address
-    dest_addr.sin_family = AF_INET;
-    dest_addr.sin_port = htons(DEST_PORT);
-    zsock_inet_pton(AF_INET, DEST_ADDR, &dest_addr.sin_addr);
+	// repeat count to trigger temp calibration "takes few msec"
+	struct sensor_value vhv_repeat_cnt = { 
+		.val1 = 15 * 60 * 10, // 10 min at 15Hz
+		.val2 = 0 };
+	LOG_INF("Setting VHV repeat count to %d ...", vhv_repeat_cnt.val1);
+	ret = sensor_attr_set(
+		dev, 
+		SENSOR_CHAN_DISTANCE, 
+		SENSOR_ATTR_VL53L8CX_VHV_REPEAT_COUNT, 
+		&vhv_repeat_cnt
+	);
+	if (ret != 0) {
+		LOG_ERR("Failed to set VHV repeat count (error %d)", ret);
+	}
+	ret = sensor_attr_get(
+		dev, 
+		SENSOR_CHAN_DISTANCE, 
+		SENSOR_ATTR_VL53L8CX_VHV_REPEAT_COUNT, 
+		&vhv_repeat_cnt
+	);
+	if (ret != 0) {
+		LOG_ERR("Failed to get VHV repeat count (error %d)", ret);
+	}
 
-    //// main loop
+	// decoder
+	const struct sensor_decoder_api *decoder;
+	sensor_get_decoder(dev, &decoder);
+
+	// UDP
+	int sock;
+	struct sockaddr_in dest_addr;
+	sock = zsock_socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	if (sock < 0) {
+		LOG_ERR("Failed to create socket: %d", errno);
+		return -EIO;
+	}
+	// destination address
+	dest_addr.sin_family = AF_INET;
+	dest_addr.sin_port = htons(DEST_PORT);
+	zsock_inet_pton(AF_INET, DEST_ADDR, &dest_addr.sin_addr);
+
+	//// main loop
 #ifdef VL53L8CX_STREAM
-    //// streaming
-    struct rtio_sqe *sqe = 0;
-    // sensor_stream
-    LOG_INF("sensor_stream()...");
-    sensor_stream(&vl53l8cx_iodev, &vl53l8cx_rtio_ctx, NULL, &sqe);
-    while (true) {
-        wait_and_read(decoder, sock, &dest_addr);
-    }
-    rtio_sqe_cancel(sqe);
+	//// streaming
+	struct rtio_sqe *sqe = 0;
+	// sensor_stream
+	LOG_INF("sensor_stream()...");
+	sensor_stream(&vl53l8cx_iodev, &vl53l8cx_rtio_ctx, NULL, &sqe);
+	while (true) {
+		wait_and_read(decoder, sock, &dest_addr);
+	}
+	rtio_sqe_cancel(sqe);
 #else
-    //// one-shot in a loop
-    while (true) {
+	//// one-shot in a loop
+	while (true) {
 		ret = sensor_read_async_mempool(&vl53l8cx_iodev, &vl53l8cx_rtio_ctx, NULL);
 		if (ret < 0) {
 			LOG_ERR("Failed to submit read: %d", ret);
 			continue;
 		}
-        wait_and_read(decoder, sock, &dest_addr);
-        // TODO go to sleep, wake up, etc)
-        k_msleep(1000);
-    }
+		wait_and_read(decoder, sock, &dest_addr);
+		// TODO go to sleep, wake up, etc)
+		k_msleep(1000);
+	}
 #endif
-    zsock_close(sock);
+	zsock_close(sock);
 
 }
